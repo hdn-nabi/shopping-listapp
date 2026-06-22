@@ -143,7 +143,9 @@
   .item.removing { animation: slide-out 0.2s ease forwards; overflow: hidden; }
 
   .check-wrap { position: relative; flex-shrink: 0; width: 22px; height: 22px; }
-  .check-wrap input[type="checkbox"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; margin: 0; }
+  .check-wrap input[type="checkbox"] {
+    position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; margin: 0;
+  }
   .check-box {
     width: 22px; height: 22px;
     border: 2px solid var(--border);
@@ -164,8 +166,16 @@
   .check-wrap input:checked ~ .check-box::after { opacity: 1; }
   .check-wrap:hover .check-box { border-color: var(--check); }
 
-  .item-text { flex: 1; font-size: 15px; line-height: 1.4; word-break: break-word; transition: color 0.2s, text-decoration-color 0.2s; }
-  .item.done .item-text { color: var(--done-txt); text-decoration: line-through; text-decoration-color: var(--done-txt); }
+  .item-text {
+    flex: 1; font-size: 15px; line-height: 1.4;
+    word-break: break-word;
+    transition: color 0.2s, text-decoration-color 0.2s;
+  }
+  .item.done .item-text {
+    color: var(--done-txt);
+    text-decoration: line-through;
+    text-decoration-color: var(--done-txt);
+  }
 
   .btn-del {
     background: none; border: none; cursor: pointer;
@@ -176,7 +186,10 @@
   }
   .btn-del:hover { color: var(--del); background: #FEF0EE; }
 
-  .footer-ctrl { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 0 4px; min-height: 28px; }
+  .footer-ctrl {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 14px; padding: 0 4px; min-height: 28px;
+  }
   .done-count { font-size: 12.5px; color: var(--muted); }
   .done-count strong { color: var(--check); }
   .btn-clear-done {
@@ -241,6 +254,7 @@
 
 </div>
 
+<!-- Supabase JS Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://zerrpqxwnblxaefmzapj.supabase.co';
