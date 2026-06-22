@@ -254,7 +254,6 @@
 
 </div>
 
-<!-- Supabase JS Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = 'https://zerrpqxwnblxaefmzapj.supabase.co';
@@ -277,11 +276,7 @@
     setTimeout(() => { errorBanner.style.display = 'none'; }, 4000);
   }
 
-  function setLoading(on) {
-    loadingEl.style.display = on ? 'block' : 'none';
-    input.disabled  = on;
-    btnAdd.disabled = on;
-  }
+  let firstLoad = true;
 
   async function fetchItems() {
     const { data, error } = await db
@@ -322,7 +317,11 @@
   }
 
   async function render() {
-    setLoading(true);
+    if (firstLoad) {
+      loadingEl.style.display = 'block';
+      input.disabled  = true;
+      btnAdd.disabled = true;
+    }
     try {
       const items = await fetchItems();
       list.innerHTML = '';
@@ -340,8 +339,11 @@
       loadingEl.style.display = 'none';
       showError('데이터를 불러오지 못했습니다: ' + err.message);
     } finally {
-      input.disabled  = false;
-      btnAdd.disabled = false;
+      if (firstLoad) {
+        firstLoad = false;
+        input.disabled  = false;
+        btnAdd.disabled = false;
+      }
     }
   }
 
@@ -356,7 +358,9 @@
       .from('shopping_items')
       .insert({ text, done: false });
 
-    if (error) showError('추가 실패: ' + error.message);
+    input.disabled  = false;
+    btnAdd.disabled = false;
+    if (error) { showError('추가 실패: ' + error.message); input.focus(); return; }
     await render();
     input.focus();
   }
@@ -366,20 +370,18 @@
       .from('shopping_items')
       .update({ done: !item.done })
       .eq('id', item.id);
-    if (error) { showError('업데이트 실패: ' + error.message); return; }
+    if (error) showError('업데이트 실패: ' + error.message);
     await render();
   }
 
-  function remove(li, id) {
+  async function remove(li, id) {
     li.classList.add('removing');
-    li.addEventListener('animationend', async () => {
-      const { error } = await db
-        .from('shopping_items')
-        .delete()
-        .eq('id', id);
-      if (error) showError('삭제 실패: ' + error.message);
-      await render();
-    }, { once: true });
+    const { error } = await db
+      .from('shopping_items')
+      .delete()
+      .eq('id', id);
+    if (error) showError('삭제 실패: ' + error.message);
+    await render();
   }
 
   btnAdd.addEventListener('click', add);
@@ -390,7 +392,7 @@
       .from('shopping_items')
       .delete()
       .eq('done', true);
-    if (error) { showError('삭제 실패: ' + error.message); return; }
+    if (error) showError('삭제 실패: ' + error.message);
     await render();
   });
 
