@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>쇼핑 리스트</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #F5F0E8;
+    --card:    #FFFFFF;
+    --text:    #2B2418;
+    --muted:   #9A8F82;
+    --accent:  #D4621A;
+    --accent-h:#B85113;
+    --check:   #2E7D52;
+    --del:     #C0392B;
+    --border:  #E2D9CE;
+    --done-bg: #F9F6F1;
+    --done-txt:#B0A698;
+    --shadow:  0 2px 12px rgba(43,36,24,0.08);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR",
+                 "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 16px 80px;
+  }
+
+  .app { width: 100%; max-width: 480px; }
+
+  .hd { margin-bottom: 28px; text-align: center; }
+  .hd-icon { font-size: 40px; display: block; margin-bottom: 8px; }
+  .hd h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+  .hd-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  #item-count { color: var(--accent); font-weight: 700; }
+
+  .input-card {
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  #new-item {
+    flex: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #new-item:focus { border-color: var(--accent); background: #fff; }
+  #new-item::placeholder { color: var(--muted); }
+
+  .btn-add {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 18px;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-add:hover { background: #BF5716; }
+  .btn-add:active { transform: scale(0.95); }
+
+  .list-card { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+
+  .empty { padding: 48px 24px; text-align: center; color: var(--muted); display: none; }
+  .empty-icon { font-size: 42px; display: block; margin-bottom: 10px; }
+  .empty p { font-size: 14px; line-height: 1.6; }
+
+  #list { list-style: none; }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+    animation: slide-in 0.2s ease;
+  }
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: #FAF7F3; }
+  .item.done { background: var(--done-bg); }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-out {
+    from { opacity: 1; transform: translateX(0); max-height: 60px; }
+    to   { opacity: 0; transform: translateX(20px); max-height: 0; padding: 0 16px; }
+  }
+  .item.removing { animation: slide-out 0.2s ease forwards; overflow: hidden; }
+
+  .check-wrap { position: relative; flex-shrink: 0; width: 22px; height: 22px; }
+  .check-wrap input[type="checkbox"] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; margin: 0; }
+  .check-box {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    background: #fff;
+    transition: border-color 0.15s, background 0.15s;
+    pointer-events: none;
+  }
+  .check-wrap input:checked ~ .check-box { background: var(--check); border-color: var(--check); }
+  .check-box::after {
+    content: ""; display: block;
+    width: 5px; height: 9px;
+    border: 2px solid #fff; border-top: none; border-left: none;
+    transform: rotate(45deg) translate(-1px, -1px);
+    opacity: 0; transition: opacity 0.1s;
+  }
+  .check-wrap input:checked ~ .check-box::after { opacity: 1; }
+  .check-wrap:hover .check-box { border-color: var(--check); }
+
+  .item-text { flex: 1; font-size: 15px; line-height: 1.4; word-break: break-word; transition: color 0.2s, text-decoration-color 0.2s; }
+  .item.done .item-text { color: var(--done-txt); text-decoration: line-through; text-decoration-color: var(--done-txt); }
+
+  .btn-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--border); font-size: 18px; line-height: 1;
+    padding: 4px; border-radius: 6px; flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-del:hover { color: var(--del); background: #FEF0EE; }
+
+  .footer-ctrl { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 0 4px; min-height: 28px; }
+  .done-count { font-size: 12.5px; color: var(--muted); }
+  .done-count strong { color: var(--check); }
+  .btn-clear-done {
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-family: inherit;
+    color: var(--muted); cursor: pointer;
+    transition: border-color 0.15s, color 0.15s; display: none;
+  }
+  .btn-clear-done:hover { border-color: var(--del); color: var(--del); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="hd">
+    <span class="hd-icon">🛒</span>
+    <h1>쇼핑 리스트</h1>
+    <p class="hd-sub">총 <span id="item-count">0</span>개 항목</p>
+  </div>
+
+  <div class="input-card">
+    <input id="new-item" type="text" placeholder="항목을 입력하세요…" autocomplete="off" maxlength="80" />
+    <button class="btn-add" id="btn-add" aria-label="항목 추가">+</button>
+  </div>
+
+  <div class="list-card">
+    <div class="empty" id="empty">
+      <span class="empty-icon">🧺</span>
+      <p>아직 항목이 없어요.<br>위에서 쇼핑 목록을 추가해 보세요!</p>
+    </div>
+    <ul id="list"></ul>
+  </div>
+
+  <div class="footer-ctrl">
+    <span class="done-count" id="done-count"></span>
+    <button class="btn-clear-done" id="btn-clear-done">완료 항목 삭제</button>
+  </div>
+</div>
+
+<script>
+  const input    = document.getElementById('new-item');
+  const btnAdd   = document.getElementById('btn-add');
+  const list     = document.getElementById('list');
+  const empty    = document.getElementById('empty');
+  const countEl  = document.getElementById('item-count');
+  const doneEl   = document.getElementById('done-count');
+  const btnClear = document.getElementById('btn-clear-done');
+
+  let items  = JSON.parse(localStorage.getItem('shopping') || '[]');
+  let nextId = parseInt(localStorage.getItem('shopping-id') || '1');
+
+  function save() {
+    localStorage.setItem('shopping', JSON.stringify(items));
+    localStorage.setItem('shopping-id', String(nextId));
+  }
+
+  function render() {
+    list.innerHTML = '';
+    items.forEach(item => list.appendChild(makeEl(item)));
+    const total = items.length;
+    const done  = items.filter(i => i.done).length;
+    empty.style.display    = total === 0 ? 'block' : 'none';
+    countEl.textContent    = total;
+    doneEl.innerHTML       = total > 0 ? `완료 <strong>${done}</strong> / ${total}` : '';
+    btnClear.style.display = done > 0 ? 'inline-block' : 'none';
+  }
+
+  function makeEl(item) {
+    const li = document.createElement('li');
+    li.className  = 'item' + (item.done ? ' done' : '');
+    li.dataset.id = item.id;
+    li.innerHTML  = `
+      <label class="check-wrap" aria-label="${item.done ? '완료 취소' : '완료 표시'}">
+        <input type="checkbox" ${item.done ? 'checked' : ''} />
+        <span class="check-box"></span>
+      </label>
+      <span class="item-text">${escHtml(item.text)}</span>
+      <button class="btn-del" aria-label="삭제">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>`;
+    li.querySelector('input[type="checkbox"]').addEventListener('change', () => toggle(item.id));
+    li.querySelector('.btn-del').addEventListener('click', () => remove(li, item.id));
+    return li;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function add() {
+    const text = input.value.trim();
+    if (!text) { input.focus(); return; }
+    items.unshift({ id: nextId++, text, done: false });
+    save(); render();
+    input.value = ''; input.focus();
+  }
+
+  function toggle(id) {
+    const item = items.find(i => i.id === id);
+    if (item) { item.done = !item.done; save(); render(); }
+  }
+
+  function remove(li, id) {
+    li.classList.add('removing');
+    li.addEventListener('animationend', () => {
+      items = items.filter(i => i.id !== id);
+      save(); render();
+    }, { once: true });
+  }
+
+  btnAdd.addEventListener('click', add);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
+
+  btnClear.addEventListener('click', () => {
+    const doneEls = [...list.querySelectorAll('.item.done')];
+    if (!doneEls.length) return;
+    let count = doneEls.length;
+    doneEls.forEach(li => {
+      li.classList.add('removing');
+      li.addEventListener('animationend', () => {
+        if (--count === 0) { items = items.filter(i => !i.done); save(); render(); }
+      }, { once: true });
+    });
+  });
+
+  render();
+</script>
+</body>
+</html>
