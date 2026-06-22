@@ -65,6 +65,7 @@
   }
   #new-item:focus { border-color: var(--accent); background: #fff; }
   #new-item::placeholder { color: var(--muted); }
+  #new-item:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-add {
     background: var(--accent);
@@ -84,12 +85,37 @@
   }
   .btn-add:hover { background: #BF5716; }
   .btn-add:active { transform: scale(0.95); }
+  .btn-add:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
   .list-card { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+
+  .loading { padding: 48px 24px; text-align: center; color: var(--muted); }
+  .loading-spinner {
+    display: inline-block;
+    width: 28px; height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { font-size: 13px; }
 
   .empty { padding: 48px 24px; text-align: center; color: var(--muted); display: none; }
   .empty-icon { font-size: 42px; display: block; margin-bottom: 10px; }
   .empty p { font-size: 14px; line-height: 1.6; }
+
+  .error-banner {
+    background: #FEF0EE;
+    border: 1px solid #F5C6C2;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--del);
+    margin-bottom: 12px;
+    display: none;
+  }
 
   #list { list-style: none; }
 
@@ -160,23 +186,40 @@
     transition: border-color 0.15s, color 0.15s; display: none;
   }
   .btn-clear-done:hover { border-color: var(--del); color: var(--del); }
+
+  .db-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--muted);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px;
+    margin-top: 20px;
+  }
+  .db-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--check); }
 </style>
 </head>
 <body>
 
 <div class="app">
+
   <div class="hd">
     <span class="hd-icon">🛒</span>
     <h1>쇼핑 리스트</h1>
     <p class="hd-sub">총 <span id="item-count">0</span>개 항목</p>
   </div>
 
+  <div class="error-banner" id="error-banner"></div>
+
   <div class="input-card">
-    <input id="new-item" type="text" placeholder="항목을 입력하세요…" autocomplete="off" maxlength="80" />
-    <button class="btn-add" id="btn-add" aria-label="항목 추가">+</button>
+    <input id="new-item" type="text" placeholder="항목을 입력하세요…"
+           autocomplete="off" maxlength="80" disabled />
+    <button class="btn-add" id="btn-add" aria-label="항목 추가" disabled>+</button>
   </div>
 
   <div class="list-card">
+    <div class="loading" id="loading">
+      <div class="loading-spinner"></div>
+      <p>데이터를 불러오는 중…</p>
+    </div>
     <div class="empty" id="empty">
       <span class="empty-icon">🧺</span>
       <p>아직 항목이 없어요.<br>위에서 쇼핑 목록을 추가해 보세요!</p>
@@ -188,97 +231,157 @@
     <span class="done-count" id="done-count"></span>
     <button class="btn-clear-done" id="btn-clear-done">완료 항목 삭제</button>
   </div>
+
+  <div style="text-align:center">
+    <span class="db-badge">
+      <span class="db-dot"></span>
+      Supabase DB 연동
+    </span>
+  </div>
+
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const input    = document.getElementById('new-item');
-  const btnAdd   = document.getElementById('btn-add');
-  const list     = document.getElementById('list');
-  const empty    = document.getElementById('empty');
-  const countEl  = document.getElementById('item-count');
-  const doneEl   = document.getElementById('done-count');
-  const btnClear = document.getElementById('btn-clear-done');
+  const SUPABASE_URL = 'https://zerrpqxwnblxaefmzapj.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_XRqvf665g_E-QsE7lgjZXQ_6RwCZWaJ';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  let items  = JSON.parse(localStorage.getItem('shopping') || '[]');
-  let nextId = parseInt(localStorage.getItem('shopping-id') || '1');
+  const input       = document.getElementById('new-item');
+  const btnAdd      = document.getElementById('btn-add');
+  const list        = document.getElementById('list');
+  const empty       = document.getElementById('empty');
+  const loadingEl   = document.getElementById('loading');
+  const countEl     = document.getElementById('item-count');
+  const doneEl      = document.getElementById('done-count');
+  const btnClear    = document.getElementById('btn-clear-done');
+  const errorBanner = document.getElementById('error-banner');
 
-  function save() {
-    localStorage.setItem('shopping', JSON.stringify(items));
-    localStorage.setItem('shopping-id', String(nextId));
+  function showError(msg) {
+    errorBanner.textContent = '⚠️ ' + msg;
+    errorBanner.style.display = 'block';
+    setTimeout(() => { errorBanner.style.display = 'none'; }, 4000);
   }
 
-  function render() {
-    list.innerHTML = '';
-    items.forEach(item => list.appendChild(makeEl(item)));
-    const total = items.length;
-    const done  = items.filter(i => i.done).length;
-    empty.style.display    = total === 0 ? 'block' : 'none';
-    countEl.textContent    = total;
-    doneEl.innerHTML       = total > 0 ? `완료 <strong>${done}</strong> / ${total}` : '';
-    btnClear.style.display = done > 0 ? 'inline-block' : 'none';
+  function setLoading(on) {
+    loadingEl.style.display = on ? 'block' : 'none';
+    input.disabled  = on;
+    btnAdd.disabled = on;
+  }
+
+  async function fetchItems() {
+    const { data, error } = await db
+      .from('shopping_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function makeEl(item) {
     const li = document.createElement('li');
     li.className  = 'item' + (item.done ? ' done' : '');
     li.dataset.id = item.id;
-    li.innerHTML  = `
+
+    li.innerHTML = `
       <label class="check-wrap" aria-label="${item.done ? '완료 취소' : '완료 표시'}">
         <input type="checkbox" ${item.done ? 'checked' : ''} />
         <span class="check-box"></span>
       </label>
       <span class="item-text">${escHtml(item.text)}</span>
       <button class="btn-del" aria-label="삭제">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+             xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M2 2l10 10M12 2L2 12" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>`;
-    li.querySelector('input[type="checkbox"]').addEventListener('change', () => toggle(item.id));
+
+    li.querySelector('input[type="checkbox"]').addEventListener('change', () => toggle(item));
     li.querySelector('.btn-del').addEventListener('click', () => remove(li, item.id));
     return li;
   }
 
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  async function render() {
+    setLoading(true);
+    try {
+      const items = await fetchItems();
+      list.innerHTML = '';
+      items.forEach(item => list.appendChild(makeEl(item)));
+
+      const total = items.length;
+      const done  = items.filter(i => i.done).length;
+
+      loadingEl.style.display = 'none';
+      empty.style.display     = total === 0 ? 'block' : 'none';
+      countEl.textContent     = total;
+      doneEl.innerHTML        = total > 0 ? `완료 <strong>${done}</strong> / ${total}` : '';
+      btnClear.style.display  = done > 0 ? 'inline-block' : 'none';
+    } catch (err) {
+      loadingEl.style.display = 'none';
+      showError('데이터를 불러오지 못했습니다: ' + err.message);
+    } finally {
+      input.disabled  = false;
+      btnAdd.disabled = false;
+    }
   }
 
-  function add() {
+  async function add() {
     const text = input.value.trim();
     if (!text) { input.focus(); return; }
-    items.unshift({ id: nextId++, text, done: false });
-    save(); render();
-    input.value = ''; input.focus();
+    input.value     = '';
+    input.disabled  = true;
+    btnAdd.disabled = true;
+
+    const { error } = await db
+      .from('shopping_items')
+      .insert({ text, done: false });
+
+    if (error) showError('추가 실패: ' + error.message);
+    await render();
+    input.focus();
   }
 
-  function toggle(id) {
-    const item = items.find(i => i.id === id);
-    if (item) { item.done = !item.done; save(); render(); }
+  async function toggle(item) {
+    const { error } = await db
+      .from('shopping_items')
+      .update({ done: !item.done })
+      .eq('id', item.id);
+    if (error) { showError('업데이트 실패: ' + error.message); return; }
+    await render();
   }
 
   function remove(li, id) {
     li.classList.add('removing');
-    li.addEventListener('animationend', () => {
-      items = items.filter(i => i.id !== id);
-      save(); render();
+    li.addEventListener('animationend', async () => {
+      const { error } = await db
+        .from('shopping_items')
+        .delete()
+        .eq('id', id);
+      if (error) showError('삭제 실패: ' + error.message);
+      await render();
     }, { once: true });
   }
 
   btnAdd.addEventListener('click', add);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') add(); });
 
-  btnClear.addEventListener('click', () => {
-    const doneEls = [...list.querySelectorAll('.item.done')];
-    if (!doneEls.length) return;
-    let count = doneEls.length;
-    doneEls.forEach(li => {
-      li.classList.add('removing');
-      li.addEventListener('animationend', () => {
-        if (--count === 0) { items = items.filter(i => !i.done); save(); render(); }
-      }, { once: true });
-    });
+  btnClear.addEventListener('click', async () => {
+    const { error } = await db
+      .from('shopping_items')
+      .delete()
+      .eq('done', true);
+    if (error) { showError('삭제 실패: ' + error.message); return; }
+    await render();
   });
 
   render();
 </script>
+
 </body>
 </html>
